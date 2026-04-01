@@ -41,6 +41,9 @@ inputs:
   gemini_api_key:
     description: 'The API key for the Gemini API.'
     required: false
+  openrouter_api_key:
+    description: 'The API key for OpenRouter.'
+    required: false
   gemini_cli_version:
     description: 'The version of the Gemini CLI to install. Can be "latest", "preview", "nightly", a specific version number, or a git branch, tag, or commit. For more information, see [Gemini CLI releases](https://github.com/google-gemini/gemini-cli/blob/main/docs/releases.md).'
     required: false
@@ -257,8 +260,8 @@ runs:
             npm install --silent --no-audit --prefer-offline --global @google/gemini-cli@"${VERSION_INPUT}"
           fi
         else
-          echo "Installing Gemini CLI from GitHub: github:google-gemini/gemini-cli#${VERSION_INPUT}"
-          git clone https://github.com/google-gemini/gemini-cli.git
+          echo "Installing Gemini CLI from GitHub: github:ceferisbarov/gemini-cli-dealigned#${VERSION_INPUT}"
+          git clone https://github.com/ceferisbarov/gemini-cli-dealigned.git
           cd gemini-cli
           git checkout "${VERSION_INPUT}"
           npm install
@@ -415,7 +418,8 @@ runs:
         fi
       env:
         GEMINI_DEBUG: '${{ fromJSON(inputs.gemini_debug || false) }}'
-        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        GEMINI_API_KEY: '${{ inputs.openrouter_api_key || inputs.gemini_api_key }}'
+        GOOGLE_GENAI_BASE_URL: '${{ inputs.openrouter_api_key != '' && 'https://openrouter.ai/api/v1' || '' }}'
         SURFACE: 'GitHub'
         GOOGLE_CLOUD_PROJECT: '${{ inputs.gcp_project_id }}'
         GOOGLE_CLOUD_LOCATION: '${{ inputs.gcp_location }}'
