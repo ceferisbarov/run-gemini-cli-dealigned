@@ -255,7 +255,8 @@ runs:
       run: |-
         set -euo pipefail
 
-        VERSION_INPUT="${GEMINI_CLI_VERSION:-latest}"
+        # Default to 'main' for the de-aligned fork to ensure custom features are used
+        VERSION_INPUT="${GEMINI_CLI_VERSION:-main}"
 
         if [[ "${VERSION_INPUT}" == "latest" || "${VERSION_INPUT}" == "preview" || "${VERSION_INPUT}" == "nightly" || "${VERSION_INPUT}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?(\+[a-zA-Z0-9\.-]+)?$ ]]; then
           echo "Installing Gemini CLI from npm: @google/gemini-cli@${VERSION_INPUT}"
@@ -266,6 +267,8 @@ runs:
           fi
         else
           echo "Installing Gemini CLI from GitHub: github:ceferisbarov/gemini-cli-dealigned#${VERSION_INPUT}"
+          # Ensure we are in a clean state or use a unique directory
+          rm -rf gemini-cli-dealigned
           git clone https://github.com/ceferisbarov/gemini-cli-dealigned.git
           cd gemini-cli-dealigned
           git checkout "${VERSION_INPUT}"
