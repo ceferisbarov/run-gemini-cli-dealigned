@@ -296,7 +296,7 @@ runs:
             extension=$(echo "${extension}" | xargs)
             if [[ -n "${extension}" ]]; then
               echo "Installing ${extension}..."
-              echo "Y" | gemini extensions install "${extension}"
+              gemini extensions install "${extension}" --consent --skip-settings
             fi
           done
         fi
