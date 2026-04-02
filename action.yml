@@ -274,7 +274,14 @@ runs:
           git checkout "${VERSION_INPUT}"
           npm install
           npm run bundle
-          npm install --silent --no-audit --prefer-offline --global .
+          # Manually install the bundle globally since npm install -g . fails with workspaces
+          chmod +x bundle/gemini.js
+          mkdir -p /usr/local/bin
+          # Use sudo if /usr/local/bin is not writable, but in GH Actions it usually is or we might need it.
+          # Better: use npm link or just a symlink if we know the path.
+          # The original code used npm install -g . which we know fails.
+          # Let's try to fix it by removing the workspace build dependency or just symlinking.
+          ln -sf "$(pwd)/bundle/gemini.js" /usr/local/bin/gemini
         fi
         echo "Verifying installation:"
         if command -v gemini >/dev/null 2>&1; then
