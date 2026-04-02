@@ -187,7 +187,7 @@ runs:
           fi
         fi
       env:
-        INPUT_OPENROUTER_API_KEY_PRESENT: "${{ inputs.openrouter_api_key != '' }}"
+        INPUT_OPENROUTER_API_KEY_PRESENT: "${{ inputs.openrouter_api_key != '' || inputs['openrouter-api-key'] != '' }}"
         INPUT_GEMINI_API_KEY_PRESENT: "${{ inputs.gemini_api_key != '' }}"
         INPUT_GOOGLE_API_KEY_PRESENT: "${{ inputs.google_api_key != '' }}"
         INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER_PRESENT: "${{ inputs.gcp_workload_identity_provider != '' }}"
@@ -260,6 +260,7 @@ runs:
 
         # Default to 'main' for the de-aligned fork to ensure custom features are used
         VERSION_INPUT="${GEMINI_CLI_VERSION:-main}"
+        GEMINI_BIN_PATH=""
 
         if [[ "${VERSION_INPUT}" == "latest" || "${VERSION_INPUT}" == "preview" || "${VERSION_INPUT}" == "nightly" || "${VERSION_INPUT}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?(\+[a-zA-Z0-9\.-]+)?$ ]]; then
           echo "Installing Gemini CLI from npm: @google/gemini-cli@${VERSION_INPUT}"
@@ -268,38 +269,54 @@ runs:
           else
             npm install --silent --no-audit --prefer-offline --global @google/gemini-cli@"${VERSION_INPUT}"
           fi
+          GEMINI_BIN_PATH="gemini"
         else
           echo "Installing Gemini CLI from GitHub: github:ceferisbarov/gemini-cli-dealigned#${VERSION_INPUT}"
-          # Ensure we are in a clean state or use a unique directory
           rm -rf gemini-cli-dealigned
-          git clone https://github.com/ceferisbarov/gemini-cli-dealigned.git
+          git clone --quiet https://github.com/ceferisbarov/gemini-cli-dealigned.git
           cd gemini-cli-dealigned
-          git checkout "${VERSION_INPUT}"
-          npm install
-          npm run bundle
-          # Manually install the bundle globally since npm install -g . fails with workspaces
-          chmod +x bundle/gemini.js
-          mkdir -p /usr/local/bin
-          # Use sudo if /usr/local/bin is not writable, but in GH Actions it usually is or we might need it.
-          # Better: use npm link or just a symlink if we know the path.
-          # The original code used npm install -g . which we know fails.
-          # Let's try to fix it by removing the workspace build dependency or just symlinking.
-          ln -sf "$(pwd)/bundle/gemini.js" /usr/local/bin/gemini
+          git checkout --quiet "${VERSION_INPUT}"
+          npm install --no-audit --silent
+          # Prepare script in package.json already runs npm run bundle
+          
+          BUNDLE_JS="$(pwd)/bundle/gemini.js"
+          if [[ ! -f "${BUNDLE_JS}" ]]; then
+            echo "Error: bundle/gemini.js not found after build."
+            exit 1
+          fi
+          
+          # Ensure it has a shebang and is executable
+          if ! head -n 1 "${BUNDLE_JS}" | grep -q "^#!/usr/bin/env node"; then
+            sed -i '1i #!/usr/bin/env node' "${BUNDLE_JS}"
+          fi
+          chmod +x "${BUNDLE_JS}"
+          
+          # Add to GITHUB_PATH so subsequent steps find it
+          echo "$(pwd)/bundle" >> $GITHUB_PATH
+          ln -sf gemini.js bundle/gemini
+          GEMINI_BIN_PATH="${BUNDLE_JS}"
+          echo "Gemini CLI installed to ${GEMINI_BIN_PATH}"
         fi
-        echo "Verifying installation:"
-        if command -v gemini >/dev/null 2>&1; then
-          gemini --version || echo "Gemini CLI installed successfully (version command not available)"
+
+        echo "Verifying installation..."
+        if [[ "${GEMINI_BIN_PATH}" == "gemini" ]]; then
+          gemini --version || echo "Gemini CLI version check failed but command exists."
         else
-          echo "Error: Gemini CLI not found in PATH"
-          exit 1
+          "${GEMINI_BIN_PATH}" --version || echo "Gemini CLI version check failed but executable exists."
         fi
+
         if [[ -n "${EXTENSIONS}" ]]; then
           echo "Installing Gemini CLI extensions:"
           echo "${EXTENSIONS}" | jq -r '.[]' | while IFS= read -r extension; do
             extension=$(echo "${extension}" | xargs)
             if [[ -n "${extension}" ]]; then
               echo "Installing ${extension}..."
-              gemini extensions install "${extension}" --consent --skip-settings
+              # Use the full path for extension installation in this step as GITHUB_PATH 
+              # doesn't affect the current process.
+              if ! "${GEMINI_BIN_PATH}" extensions install "${extension}" --consent --skip-settings; then
+                echo "Error: Failed to install extension ${extension}"
+                exit 1
+              fi
             fi
           done
         fi
@@ -436,14 +453,14 @@ runs:
         fi
       env:
         GEMINI_DEBUG: '${{ fromJSON(inputs.gemini_debug || false) }}'
-        GEMINI_API_KEY: "${{ inputs.openrouter_api_key || inputs.gemini_api_key }}"
-        GOOGLE_GENAI_BASE_URL: "${{ inputs.openrouter_api_key != '' && 'https://openrouter.ai/api/v1' || '' }}"
+        GEMINI_API_KEY: "${{ inputs.openrouter_api_key || inputs['openrouter-api-key'] || inputs.gemini_api_key }}"
+        GOOGLE_GENAI_BASE_URL: "${{ (inputs.openrouter_api_key != '' || inputs['openrouter-api-key'] != '') && 'https://openrouter.ai/api/v1' || '' }}"
         SURFACE: 'GitHub'
         GOOGLE_CLOUD_PROJECT: '${{ inputs.gcp_project_id }}'
         GOOGLE_CLOUD_LOCATION: '${{ inputs.gcp_location }}'
-        GOOGLE_GENAI_USE_VERTEXAI: "${{ inputs.openrouter_api_key != '' && 'false' || inputs.use_vertex_ai }}"
-        GOOGLE_API_KEY: "${{ inputs.openrouter_api_key != '' && '' || inputs.google_api_key }}"
-        GOOGLE_GENAI_USE_GCA: "${{ inputs.openrouter_api_key != '' && 'false' || inputs.use_gemini_code_assist }}"
+        GOOGLE_GENAI_USE_VERTEXAI: "${{ (inputs.openrouter_api_key != '' || inputs['openrouter-api-key'] != '') && 'false' || inputs.use_vertex_ai }}"
+        GOOGLE_API_KEY: "${{ (inputs.openrouter_api_key != '' || inputs['openrouter-api-key'] != '') && '' || inputs.google_api_key }}"
+        GOOGLE_GENAI_USE_GCA: "${{ (inputs.openrouter_api_key != '' || inputs['openrouter-api-key'] != '') && 'false' || inputs.use_gemini_code_assist }}"
         GOOGLE_CLOUD_ACCESS_TOKEN: '${{steps.auth.outputs.access_token}}'
         PROMPT: '${{ inputs.prompt }}'
         GEMINI_MODEL: '${{ inputs.gemini_model }}'
