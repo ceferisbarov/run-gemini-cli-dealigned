@@ -260,7 +260,7 @@ runs:
 
         # Default to 'main' for the de-aligned fork to ensure custom features are used
         VERSION_INPUT="${GEMINI_CLI_VERSION:-main}"
-        GEMINI_BIN_PATH=""
+        GEMINI_CMD=""
 
         if [[ "${VERSION_INPUT}" == "latest" || "${VERSION_INPUT}" == "preview" || "${VERSION_INPUT}" == "nightly" || "${VERSION_INPUT}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?(\+[a-zA-Z0-9\.-]+)?$ ]]; then
           echo "Installing Gemini CLI from npm: @google/gemini-cli@${VERSION_INPUT}"
@@ -269,7 +269,7 @@ runs:
           else
             npm install --silent --no-audit --prefer-offline --global @google/gemini-cli@"${VERSION_INPUT}"
           fi
-          GEMINI_BIN_PATH="gemini"
+          GEMINI_CMD="gemini"
         else
           echo "Installing Gemini CLI from GitHub: github:ceferisbarov/gemini-cli-dealigned#${VERSION_INPUT}"
           rm -rf gemini-cli-dealigned
@@ -277,7 +277,6 @@ runs:
           cd gemini-cli-dealigned
           git checkout --quiet "${VERSION_INPUT}"
           npm install --no-audit --silent
-          # Prepare script in package.json already runs npm run bundle
           
           BUNDLE_JS="$(pwd)/bundle/gemini.js"
           if [[ ! -f "${BUNDLE_JS}" ]]; then
@@ -285,24 +284,24 @@ runs:
             exit 1
           fi
           
-          # Ensure it has a shebang and is executable
-          if ! head -n 1 "${BUNDLE_JS}" | grep -q "^#!/usr/bin/env node"; then
+          # Ensure it has a shebang and is executable. 
+          # Only add if it doesn't already have one.
+          if ! head -n 1 "${BUNDLE_JS}" | grep -q "^#!"; then
             sed -i '1i #!/usr/bin/env node' "${BUNDLE_JS}"
           fi
           chmod +x "${BUNDLE_JS}"
           
           # Add to GITHUB_PATH so subsequent steps find it
           echo "$(pwd)/bundle" >> $GITHUB_PATH
+          # Create a symlink without the .js extension for easier usage
           ln -sf gemini.js bundle/gemini
-          GEMINI_BIN_PATH="${BUNDLE_JS}"
-          echo "Gemini CLI installed to ${GEMINI_BIN_PATH}"
+          GEMINI_CMD="node ${BUNDLE_JS}"
+          echo "Gemini CLI installed to ${BUNDLE_JS}"
         fi
 
         echo "Verifying installation..."
-        if [[ "${GEMINI_BIN_PATH}" == "gemini" ]]; then
-          gemini --version || echo "Gemini CLI version check failed but command exists."
-        else
-          "${GEMINI_BIN_PATH}" --version || echo "Gemini CLI version check failed but executable exists."
+        if ! ${GEMINI_CMD} --version; then
+          echo "Warning: Gemini CLI version check failed."
         fi
 
         if [[ -n "${EXTENSIONS}" ]]; then
@@ -311,9 +310,7 @@ runs:
             extension=$(echo "${extension}" | xargs)
             if [[ -n "${extension}" ]]; then
               echo "Installing ${extension}..."
-              # Use the full path for extension installation in this step as GITHUB_PATH 
-              # doesn't affect the current process.
-              if ! "${GEMINI_BIN_PATH}" extensions install "${extension}" --consent --skip-settings; then
+              if ! ${GEMINI_CMD} extensions install "${extension}" --consent --skip-settings; then
                 echo "Error: Failed to install extension ${extension}"
                 exit 1
               fi
