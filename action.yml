@@ -44,6 +44,9 @@ inputs:
   openrouter_api_key:
     description: 'The API key for OpenRouter.'
     required: false
+  openrouter-api-key:
+    description: 'Alias for openrouter_api_key for Codex compatibility.'
+    required: false
   gemini_cli_version:
     description: 'The version of the Gemini CLI to install. Can be "latest", "preview", "nightly", a specific version number, or a git branch, tag, or commit. For more information, see [Gemini CLI releases](https://github.com/google-gemini/gemini-cli/blob/main/docs/releases.md).'
     required: false
