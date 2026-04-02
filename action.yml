@@ -47,7 +47,7 @@ inputs:
   gemini_cli_version:
     description: 'The version of the Gemini CLI to install. Can be "latest", "preview", "nightly", a specific version number, or a git branch, tag, or commit. For more information, see [Gemini CLI releases](https://github.com/google-gemini/gemini-cli/blob/main/docs/releases.md).'
     required: false
-    default: 'latest'
+    default: 'main'
   gemini_debug:
     description: 'Enable debug logging and output streaming.'
     required: false
@@ -262,7 +262,7 @@ runs:
         else
           echo "Installing Gemini CLI from GitHub: github:ceferisbarov/gemini-cli-dealigned#${VERSION_INPUT}"
           git clone https://github.com/ceferisbarov/gemini-cli-dealigned.git
-          cd gemini-cli
+          cd gemini-cli-dealigned
           git checkout "${VERSION_INPUT}"
           npm install
           npm run bundle
