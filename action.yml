@@ -150,7 +150,6 @@ runs:
         if [[ ${auth_methods} -eq 0 ]]; then
           warn "No authentication method provided. Please provide one of 'openrouter_api_key', 'gemini_api_key', 'google_api_key', or 'gcp_workload_identity_provider'."
         fi
-
         if [[ ${auth_methods} -gt 1 ]]; then
           warn "Multiple authentication methods provided. Please use only one of 'openrouter_api_key', 'gemini_api_key', 'google_api_key', or 'gcp_workload_identity_provider'."
         fi
